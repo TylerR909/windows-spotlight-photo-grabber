@@ -1,6 +1,8 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer';
 import { enableLiveReload } from 'electron-compile';
+import path from 'path';
+import Store from './Store';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -9,6 +11,13 @@ let mainWindow;
 const isDevMode = process.execPath.match(/[\\/]electron/);
 
 if (isDevMode) enableLiveReload({ strategy: 'react-hmr' });
+
+const store = new Store({
+  configName: 'settings',
+  defaults: {
+    outputDir: path.join(app.getPath('pictures'), 'Windows Spotlight Photos'),
+  },
+});
 
 const createWindow = async () => {
   // Create the browser window.
@@ -33,11 +42,12 @@ const createWindow = async () => {
     // when you should delete the corresponding element.
     mainWindow = null;
   });
+
+  ipcMain.on('updateOutputDir', (event, data) => {
+    store.set('outputDir', data);
+  });
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.on('ready', createWindow);
 
 // Quit when all windows are closed.

@@ -1,7 +1,7 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { remote } from 'electron';
+import { remote, ipcRenderer } from 'electron';
 import sizeOf from 'image-size';
 import Gallery from './Gallery';
 
@@ -10,10 +10,11 @@ class App extends React.Component {
     super(props);
     this.state = {
       mode: 'normal',
+      savePath: '',
     };
   }
 
-  static getFilteredImageInfo() {
+  getFilteredImageInfo() {
     const roamingPath = remote.app.getPath('appData');
     const imageDirPath = path.resolve(roamingPath, '../Local/Packages/Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy/LocalState/Assets');
 
@@ -32,14 +33,21 @@ class App extends React.Component {
         height: dimensions.height,
       };
     });
-    return fileData.filter(img => img.height > 300);
+    return fileData.filter(img => img.height > 650);
+  }
+
+  setSaveToPath([outputDir]) {
+    ipcRenderer.send('updateOutputDir', { outputDir });
   }
 
   render() {
-    const images = App.getFilteredImageInfo().filter((img) =>
+    /* eslint-disable */
+    const images = this.getFilteredImageInfo().filter(img =>
       this.state.mode === 'normal'
         ? img.width >= img.height
-        : img.height > img.width);
+        : img.height > img.width
+    );
+    /* eslint-enable */
     return (
       <div>
         <h2>Welcome to React!</h2>
@@ -48,6 +56,11 @@ class App extends React.Component {
         </button>
         <button onClick={() => this.setState({ mode: 'phone' })}>
           Phone
+        </button>
+        <br />
+        { this.state.savePath && `Saving to ${this.state.savePath}`}
+        <button onClick={() => remote.dialog.showOpenDialog({ properties: ['openDirectory'] }, this.setSaveToPath)}>
+          { this.state.savePath ? 'Change' : 'Set Save Path' }
         </button>
         <Gallery images={images} />
       </div>
