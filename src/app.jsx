@@ -1,48 +1,63 @@
 import React from 'react';
-import fs from 'fs';
 import path from 'path';
 import { remote, ipcRenderer } from 'electron';
-import sizeOf from 'image-size';
-import Gallery from './Gallery';
+import Gallery from './components/Gallery';
+
+const defaultImagePath = path.resolve(
+  remote.app.getPath('pictures'),
+  'Windows Spotlight Photos',
+);
 
 class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       mode: 'normal',
-      savePath: '',
+      outputDir: localStorage.getItem('outputDir') || defaultImagePath,
+      images: [],
     };
+
+    this.setSaveToPath = this.setSaveToPath.bind(this);
+    this.saveImage = this.saveImage.bind(this);
   }
 
-  getFilteredImageInfo() {
-    const roamingPath = remote.app.getPath('appData');
-    const imageDirPath = path.resolve(roamingPath, '../Local/Packages/Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy/LocalState/Assets');
+  componentDidMount() {
+    this.registerListeners.call(this);
+  }
 
-    const files = fs.readdirSync(imageDirPath);
-    const filePaths = files.map(file => path.resolve(imageDirPath, file));
-    const fileData = filePaths.map((file) => {
-      let dimensions;
-      try {
-        dimensions = sizeOf(file);
-      } catch (e) {
-        dimensions = { width: 0, height: 0 };
-      }
-      return {
-        path: file,
-        width: dimensions.width,
-        height: dimensions.height,
-      };
+  registerListeners() {
+    ipcRenderer.on('data', (event, data) => {
+      this.setState({
+        images: data,
+      });
     });
-    return fileData.filter(img => img.height > 650);
+
+    ipcRenderer.on('imageSaved', (event, data) => {
+      console.log('image saved!', data);
+    });
+
+    ipcRenderer.on('imageSaveFailed', (event, data) => {
+      console.log('failed to save image', data);
+    });
   }
 
-  setSaveToPath([outputDir]) {
-    ipcRenderer.send('updateOutputDir', { outputDir });
+  saveImage(imgPath) {
+    ipcRenderer.send('saveImage', {
+      sourceImage: imgPath,
+      destinationDir: this.state.outputDir,
+    });
+  }
+
+  setSaveToPath(paths) {
+    if (!paths) return;
+    const [outputDir] = paths;
+    localStorage.setItem('outputDir', outputDir);
+    this.setState({ outputDir });
   }
 
   render() {
     /* eslint-disable */
-    const images = this.getFilteredImageInfo().filter(img =>
+    const images = this.state.images.filter(img =>
       this.state.mode === 'normal'
         ? img.width >= img.height
         : img.height > img.width
@@ -58,11 +73,18 @@ class App extends React.Component {
           Phone
         </button>
         <br />
-        { this.state.savePath && `Saving to ${this.state.savePath}`}
-        <button onClick={() => remote.dialog.showOpenDialog({ properties: ['openDirectory'] }, this.setSaveToPath)}>
-          { this.state.savePath ? 'Change' : 'Set Save Path' }
+        { this.state.outputDir && `Saving to ${this.state.outputDir}`}
+        <button
+          onClick={() => {
+            remote.dialog.showOpenDialog(
+              { properties: ['openDirectory'] },
+              this.setSaveToPath,
+            );
+          }}
+        >
+          Change
         </button>
-        <Gallery images={images} />
+        <Gallery images={images} onItemPress={this.saveImage} />
       </div>
     );
   }

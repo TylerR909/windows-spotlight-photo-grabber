@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import Image from './components/Image';
+import Image from './Image';
 
 class Gallery extends Component {
   render() {
@@ -10,7 +10,7 @@ class Gallery extends Component {
           <Image
             key={img.path}
             path={img.path}
-            onClick={() => console.log(img.path)}
+            onClick={() => this.props.onItemPress(img.path)}
           />
           ))
         }
@@ -25,6 +25,7 @@ Gallery.propTypes = {
       path: PropTypes.string,
     }),
   ).isRequired,
+  onItemPress: PropTypes.func.isRequired,
 };
 
 export default Gallery;

@@ -1,8 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer';
 import { enableLiveReload } from 'electron-compile';
-import path from 'path';
-import Store from './Store';
+import os from 'os';
+import data from './services/data';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -11,13 +11,6 @@ let mainWindow;
 const isDevMode = process.execPath.match(/[\\/]electron/);
 
 if (isDevMode) enableLiveReload({ strategy: 'react-hmr' });
-
-const store = new Store({
-  configName: 'settings',
-  defaults: {
-    outputDir: path.join(app.getPath('pictures'), 'Windows Spotlight Photos'),
-  },
-});
 
 const createWindow = async () => {
   // Create the browser window.
@@ -43,12 +36,25 @@ const createWindow = async () => {
     mainWindow = null;
   });
 
-  ipcMain.on('updateOutputDir', (event, data) => {
-    store.set('outputDir', data);
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.send('data', data.getImageMetaData());
+  });
+
+  ipcMain.on('saveImage', (event, { sourceImage, destinationDir }) => {
+    const success = data.saveImage(sourceImage, destinationDir);
+    if (success) {
+      mainWindow.webContents.send('imageSaved', sourceImage);
+    } else {
+      mainWindow.webContents.send('imageSaveFailed', sourceImage);
+    }
   });
 };
 
-app.on('ready', createWindow);
+if (process.platform === 'win32' && os.release().startsWith('10.')) {
+  app.on('ready', createWindow);
+} else {
+  process.exit(1);
+}
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
